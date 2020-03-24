@@ -2,14 +2,28 @@
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const isDev = process.env.NODE_ENV === "development";
 const config = require("./public/config")[isDev ? "dev" : "build"];
+const path = require("path");
 module.exports = {
   // mode:'development',
   mode: isDev ? "development" : "production",
+  entry: "./src/index.js",
+  output: {
+    //路径必须是绝对路径
+    path: path.resolve(__dirname, "dist"),
+    //考虑到CDN缓存问题，并且可以指定hash串长度
+    filename: "bundle.[hash:6].js",
+    //通常是CDN地址，可以不配置，或者配置为/
+    publicPath: "/"
+  },
   module: {
     rules: [
       {
-        // test: /\.jsx?$/,
-        // use: ["babel-loader"],
+        test: /\.jsx?$/,
+        use: ["babel-loader"],
+        //排除 node_modules 目录
+        exclude: /node_modules/
+      },
+      {
         test: /\.(le|c)ss$/,
         use: [
           "style-loader",
@@ -28,8 +42,31 @@ module.exports = {
           },
           "less-loader"
         ],
-        exclude: /node_modules/ //排除 node_modules 目录
+        exclude: /node_modules/
+      },
+      {
+        test: /\.(png|jpg|gif|jpeg|webp|svg|eot|ttf|woff|woff2)$/,
+        use: [
+          {
+            loader: "url-loader",
+            options: {
+              //资源大小小于10K,将资源转换为base64，超过10K，将图片拷贝到dist目录。将资源转换为 base64 可以减少网络请求次数，但是 base64 数据较大，如果太多的资源是 base64，会导致加载变慢，因此设置 limit 值时，需要二者兼顾。
+              limit: 10240,
+              //esModule设置为false，否则<img src={require('XXX.jpg')} />会出现 <img src=[Module Object] />
+              esModule: false,
+              //为了保留图片的原始扩展名
+              name: "[name]_[hash:6].[ext]",
+              //如果图片文件很多的话，设置文件存放路径，就会出现一个assets文件专门存放图片
+              outputPath: "assets"
+            }
+          }
+        ],
+        exclude: /node_modules/
       }
+      // {
+      //   test: /.html$/,
+      //   use: "html-withimg-loader"
+      // }
     ]
   },
   plugins: [
@@ -58,8 +95,18 @@ module.exports = {
     clientLogLevel: "silent", //日志等级
     compress: true //是否启用gzip
   },
-  devtool: "cheap-module-eval-source-map" //开发环境下使用
+  devtool: "cheap-module-eval-source-map", //开发环境下使用
+  performance: {
+    hints: "warning", // 枚举
+    maxAssetSize: 30000000, // 整数类型（以字节为单位）
+    maxEntrypointSize: 50000000, // 整数类型（以字节为单位）
+    assetFilter: function(assetFilename) {
+      // 提供资源文件名的断言函数
+      return assetFilename.endsWith(".css") || assetFilename.endsWith(".js");
+    }
+  }
 };
+
 // module.exports = {
 //     // mode: 'development',
 //     module: {
