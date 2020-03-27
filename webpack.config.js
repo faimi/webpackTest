@@ -3,10 +3,21 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 const isDev = process.env.NODE_ENV === "development";
 const config = require("./public/config")[isDev ? "dev" : "build"];
 const path = require("path");
+const { CleanWebpackPlugin } = require("clean-webpack-plugin");
+const CopyWebpackPlugin = require("copy-webpack-plugin");
+const webpack = require("webpack");
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const OptimizeCssPlugin = require("optimize-css-assets-webpack-plugin");
+const apiMocker = require("mocker-api");
+
 module.exports = {
   // mode:'development',
   mode: isDev ? "development" : "production",
-  entry: "./src/index.js",
+  // entry: "./src/index.js",
+  entry: {
+    index: "./src/index.js",
+    login: "./src/login.js"
+  },
   output: {
     //路径必须是绝对路径
     path: path.resolve(__dirname, "dist"),
@@ -26,16 +37,24 @@ module.exports = {
       {
         test: /\.(le|c)ss$/,
         use: [
-          "style-loader",
+          {
+            loader: MiniCssExtractPlugin.loader,
+            options: {
+              hmr: isDev,
+              reloadAll: true
+            }
+          },
+          //替换之前的style-loader
+          // MiniCssExtractPlugin.loader,
+          // "style-loader",
           "css-loader",
           {
             loader: "postcss-loader",
             options: {
               plugins: function() {
                 return [
-                  require("autoprefixer")({
-                    overrideBrowserslist: [">0.25%", "not dead"]
-                  })
+                  //overrideBrowserslist被存储到.browserslistrc文件夹下
+                  require("autoprefixer")()
                 ];
               }
             }
@@ -83,7 +102,58 @@ module.exports = {
       },
       //hash默认是false
       // hash:true,
-      config: config.template
+      config: config.template,
+      chunks: ["index"]
+    }),
+    new HtmlWebpackPlugin({
+      template: "./public/login.html",
+      filename: "login.html",
+      minify: {
+        removeAttributeQuotes: false,
+        collapseWhitespace: false
+      },
+      config: config.template,
+      chunks: ["login"]
+    }),
+    new CleanWebpackPlugin(),
+    new CopyWebpackPlugin(
+      [
+        {
+          from: "public/js/*.js",
+          to: path.resolve(__dirname, "dist", "js"),
+          //flatten属性只会拷贝文件，不会把文件路径也拷贝上
+          flatten: true
+        },
+        {
+          from: "public/css/*.css",
+          to: path.resolve(__dirname, "dist", "css"),
+          flatten: true
+        }
+      ],
+      {
+        //忽略another.css文件和another.js文件
+        //ignore: ["another.css", "another.js"]
+      }
+    ),
+    new webpack.ProvidePlugin({
+      //Vue的配置必须有default，因为vue.em.js是靠export default导出的
+      Vue: ["vue/dist/vue.esm.js", "default"],
+      //React不需要default，因为React是靠module.export导出的
+      React: "react",
+      Component: ["react", "Component"],
+      $: "jquery",
+      _map: ["lodash", "map"]
+    }),
+    new MiniCssExtractPlugin({
+      filename: "css1/[name].css"
+      // publicPath:'../'
+    }),
+    new OptimizeCssPlugin(),
+    //热更新
+    new webpack.HotModuleReplacementPlugin(),
+    new webpack.DefinePlugin({
+      DEV: JSON.stringify("dev"),
+      FLAG: "true"
     })
   ],
   devServer: {
@@ -93,7 +163,25 @@ module.exports = {
     stats: "errors-only", //终端仅打印error，当启用了quiet或者是noInfo时，此属性不起作用
     overlay: false, //默认不启用，启用后当编译出错时，会在浏览器窗口全屏输出错误。
     clientLogLevel: "silent", //日志等级
-    compress: true //是否启用gzip
+    compress: true, //是否启用gzip
+    hot: true,
+    proxy: {
+      "/api": {
+        target: "http://localhost:4000",
+        // 在配置代理时，去掉/api
+        pathRewrite: {
+          api: ""
+        }
+      }
+    },
+    // before(app) {
+    //   app.get("/sex", (req, res) => {
+    //     res.json({ sex: "girl" });
+    //   });
+    // }
+    before(app) {
+      apiMocker(app, path.resolve("./mock/mocker.js"));
+    }
   },
   devtool: "cheap-module-eval-source-map", //开发环境下使用
   performance: {
@@ -104,6 +192,9 @@ module.exports = {
       // 提供资源文件名的断言函数
       return assetFilename.endsWith(".css") || assetFilename.endsWith(".js");
     }
+  },
+  resolve: {
+    modules: ["./src/components", "node_modules"]
   }
 };
 
