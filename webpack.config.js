@@ -9,8 +9,11 @@ const webpack = require("webpack");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const OptimizeCssPlugin = require("optimize-css-assets-webpack-plugin");
 const apiMocker = require("mocker-api");
+const SpeedMesureWebpackPlugin = require("speed-measure-webpack-plugin");
+const smwp = new SpeedMesureWebpackPlugin();
+const HappyPack = require("happypack");
 
-module.exports = {
+const configs = {
   // mode:'development',
   mode: isDev ? "development" : "production",
   // entry: "./src/index.js",
@@ -30,13 +33,16 @@ module.exports = {
     rules: [
       {
         test: /\.jsx?$/,
-        use: ["babel-loader"],
+        use: ["thread-loader","cache-loader", "babel-loader"],
+        // use: "HappyPack/loader?id=js",
         //排除 node_modules 目录
-        exclude: /node_modules/
+        exclude: /node_modules/,
+        include: [path.resolve(__dirname, "src")]
       },
       {
         test: /\.(le|c)ss$/,
         use: [
+          "cache-loader",
           {
             loader: MiniCssExtractPlugin.loader,
             options: {
@@ -61,25 +67,28 @@ module.exports = {
           },
           "less-loader"
         ],
+        // use: "HappyPack/loader?id=css",
         exclude: /node_modules/
       },
       {
         test: /\.(png|jpg|gif|jpeg|webp|svg|eot|ttf|woff|woff2)$/,
-        use: [
-          {
-            loader: "url-loader",
-            options: {
-              //资源大小小于10K,将资源转换为base64，超过10K，将图片拷贝到dist目录。将资源转换为 base64 可以减少网络请求次数，但是 base64 数据较大，如果太多的资源是 base64，会导致加载变慢，因此设置 limit 值时，需要二者兼顾。
-              limit: 10240,
-              //esModule设置为false，否则<img src={require('XXX.jpg')} />会出现 <img src=[Module Object] />
-              esModule: false,
-              //为了保留图片的原始扩展名
-              name: "[name]_[hash:6].[ext]",
-              //如果图片文件很多的话，设置文件存放路径，就会出现一个assets文件专门存放图片
-              outputPath: "assets"
-            }
-          }
-        ],
+        // use: [
+        //   "cache-loader",
+        //   {
+        //     loader: "url-loader",
+        //     options: {
+        //       //资源大小小于10K,将资源转换为base64，超过10K，将图片拷贝到dist目录。将资源转换为 base64 可以减少网络请求次数，但是 base64 数据较大，如果太多的资源是 base64，会导致加载变慢，因此设置 limit 值时，需要二者兼顾。
+        //       limit: 10240,
+        //       //esModule设置为false，否则<img src={require('XXX.jpg')} />会出现 <img src=[Module Object] />
+        //       esModule: false,
+        //       //为了保留图片的原始扩展名
+        //       name: "[name]_[hash:6].[ext]",
+        //       //如果图片文件很多的话，设置文件存放路径，就会出现一个assets文件专门存放图片
+        //       outputPath: "assets"
+        //     }
+        //   }
+        // ],
+        use: "HappyPack/loader?id=file",
         exclude: /node_modules/
       }
       // {
@@ -154,6 +163,60 @@ module.exports = {
     new webpack.DefinePlugin({
       DEV: JSON.stringify("dev"),
       FLAG: "true"
+    }),
+    // new HappyPack({
+    //   id: "js",
+    //   use: ["thread-loader","cache-loader", "babel-loader"]
+    // }),
+    // new HappyPack({
+    //   id: "css",
+    //   use: [
+    //     "thread-loader",
+    //     "cache-loader",
+    //     {
+    //       loader: MiniCssExtractPlugin.loader,
+    //       options: {
+    //         hmr: isDev,
+    //         reloadAll: true
+    //       }
+    //     },
+    //     //替换之前的style-loader
+    //     // MiniCssExtractPlugin.loader,
+    //     // "style-loader",
+    //     "css-loader",
+    //     {
+    //       loader: "postcss-loader",
+    //       options: {
+    //         plugins: function() {
+    //           return [
+    //             //overrideBrowserslist被存储到.browserslistrc文件夹下
+    //             require("autoprefixer")()
+    //           ];
+    //         }
+    //       }
+    //     },
+    //     "less-loader"
+    //   ]
+    // }),
+    new HappyPack({
+      id: "file", //和rule中的id=file对应
+      use: [
+        // "thread-loader",
+        "cache-loader",
+        {
+          loader: "url-loader",
+          options: {
+            //资源大小小于10K,将资源转换为base64，超过10K，将图片拷贝到dist目录。将资源转换为 base64 可以减少网络请求次数，但是 base64 数据较大，如果太多的资源是 base64，会导致加载变慢，因此设置 limit 值时，需要二者兼顾。
+            limit: 10240,
+            //esModule设置为false，否则<img src={require('XXX.jpg')} />会出现 <img src=[Module Object] />
+            esModule: false,
+            //为了保留图片的原始扩展名
+            name: "[name]_[hash:6].[ext]",
+            //如果图片文件很多的话，设置文件存放路径，就会出现一个assets文件专门存放图片
+            outputPath: "assets"
+          }
+        }
+      ]
     })
   ],
   devServer: {
@@ -197,6 +260,8 @@ module.exports = {
     modules: ["./src/components", "node_modules"]
   }
 };
+
+module.exports = smwp.wrap(configs);
 
 // module.exports = {
 //     // mode: 'development',
