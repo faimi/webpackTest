@@ -12,6 +12,7 @@ const apiMocker = require("mocker-api");
 const SpeedMesureWebpackPlugin = require("speed-measure-webpack-plugin");
 const smwp = new SpeedMesureWebpackPlugin();
 const HappyPack = require("happypack");
+const HardSourceWebpackPlugin = require("hard-source-webpack-plugin");
 
 const configs = {
   // mode:'development',
@@ -33,7 +34,7 @@ const configs = {
     rules: [
       {
         test: /\.jsx?$/,
-        use: ["thread-loader","cache-loader", "babel-loader"],
+        use: ["thread-loader", "cache-loader", "babel-loader"],
         // use: "HappyPack/loader?id=js",
         //排除 node_modules 目录
         exclude: /node_modules/,
@@ -217,7 +218,9 @@ const configs = {
           }
         }
       ]
-    })
+    }),
+    new HardSourceWebpackPlugin(),
+    new webpack.IgnorePlugin(/^\.\/locale$/, /moment$/)
   ],
   devServer: {
     port: "8000", //默认是8080
@@ -258,6 +261,9 @@ const configs = {
   },
   resolve: {
     modules: ["./src/components", "node_modules"]
+  },
+  externals: {
+    vue: "vue"
   }
 };
 
